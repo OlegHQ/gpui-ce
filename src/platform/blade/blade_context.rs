@@ -5,7 +5,9 @@ use util::ResultExt;
 
 #[cfg_attr(target_os = "macos", derive(Clone))]
 pub struct BladeContext {
-    pub(super) gpu: Arc<gpu::Context>,
+    /// The underlying Blade GPU context. Exposed for external renderers
+    /// that need to share textures with GPUI (zero-copy rendering).
+    pub gpu: Arc<gpu::Context>,
 }
 
 impl BladeContext {

@@ -88,6 +88,16 @@ pub use linux::layer_shell;
 #[cfg(any(test, feature = "test-support"))]
 pub use test::{TestDispatcher, TestScreenCaptureSource, TestScreenCaptureStream};
 
+/// Blade GPU backend - exposed for external renderers that need zero-copy texture sharing.
+#[cfg(any(
+    all(
+        any(target_os = "linux", target_os = "freebsd"),
+        any(feature = "x11", feature = "wayland")
+    ),
+    all(target_os = "macos", feature = "macos-blade")
+))]
+pub use blade::{BladeContext, gpu};
+
 /// Returns a background executor for the current platform.
 pub fn background_executor() -> BackgroundExecutor {
     current_platform(true).background_executor()

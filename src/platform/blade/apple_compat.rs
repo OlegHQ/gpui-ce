@@ -6,6 +6,16 @@ use std::{ffi::c_void, ptr::NonNull};
 pub struct Context {
     inner: BladeContext,
 }
+
+impl Context {
+    /// Get the underlying Blade GPU context for external renderers.
+    /// This allows sharing textures between GPUI and external rendering code
+    /// without CPU copies.
+    pub fn gpu(&self) -> &std::sync::Arc<gpu::Context> {
+        &self.inner.gpu
+    }
+}
+
 impl Default for Context {
     fn default() -> Self {
         Self {
