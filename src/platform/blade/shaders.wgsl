@@ -1297,3 +1297,50 @@ fn fs_surface(input: SurfaceVarying) -> @location(0) vec4<f32> {
 
     return ycbcr_to_RGB * y_cb_cr;
 }
+
+// --- blade textures --- //
+// External textures rendered by external Blade renderers (e.g., isos-render)
+// displayed via zero-copy GPU texture sharing.
+
+struct BladeTextureParams {
+    bounds: Bounds,
+    content_mask: Bounds,
+    corner_radii: Corners,
+    opacity: f32,
+}
+
+var<uniform> texture_locals: BladeTextureParams;
+var t_texture: texture_2d<f32>;
+var s_texture: sampler;
+
+struct BladeTextureVarying {
+    @builtin(position) position: vec4<f32>,
+    @location(0) texture_position: vec2<f32>,
+    @location(3) clip_distances: vec4<f32>,
+}
+
+@vertex
+fn vs_blade_texture(@builtin(vertex_index) vertex_id: u32) -> BladeTextureVarying {
+    let unit_vertex = vec2<f32>(f32(vertex_id & 1u), 0.5 * f32(vertex_id & 2u));
+
+    var out = BladeTextureVarying();
+    out.position = to_device_position(unit_vertex, texture_locals.bounds);
+    out.texture_position = unit_vertex;
+    out.clip_distances = distance_from_clip_rect(unit_vertex, texture_locals.bounds, texture_locals.content_mask);
+    return out;
+}
+
+@fragment
+fn fs_blade_texture(input: BladeTextureVarying) -> @location(0) vec4<f32> {
+    // Alpha clip first
+    if (any(input.clip_distances < vec4<f32>(0.0))) {
+        return vec4<f32>(0.0);
+    }
+
+    let color = textureSample(t_texture, s_texture, input.texture_position);
+
+    // Apply corner radii clipping
+    let distance = quad_sdf(input.position.xy, texture_locals.bounds, texture_locals.corner_radii);
+
+    return blend_color(color, texture_locals.opacity * saturate(0.5 - distance));
+}

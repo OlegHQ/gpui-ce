@@ -32,6 +32,11 @@ pub(crate) struct Scene {
     pub(crate) monochrome_sprites: Vec<MonochromeSprite>,
     pub(crate) polychrome_sprites: Vec<PolychromeSprite>,
     pub(crate) surfaces: Vec<PaintSurface>,
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    pub(crate) blade_textures: Vec<BladeTexture>,
 }
 
 impl Scene {
@@ -46,6 +51,11 @@ impl Scene {
         self.monochrome_sprites.clear();
         self.polychrome_sprites.clear();
         self.surfaces.clear();
+        #[cfg(any(
+            all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+            all(target_os = "macos", feature = "macos-blade")
+        ))]
+        self.blade_textures.clear();
     }
 
     pub fn len(&self) -> usize {
@@ -109,6 +119,14 @@ impl Scene {
                 surface.order = order;
                 self.surfaces.push(surface.clone());
             }
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            Primitive::BladeTexture(texture) => {
+                texture.order = order;
+                self.blade_textures.push(texture.clone());
+            }
         }
         self.paint_operations
             .push(PaintOperation::Primitive(primitive));
@@ -134,6 +152,11 @@ impl Scene {
         self.polychrome_sprites
             .sort_by_key(|sprite| (sprite.order, sprite.tile.tile_id));
         self.surfaces.sort_by_key(|surface| surface.order);
+        #[cfg(any(
+            all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+            all(target_os = "macos", feature = "macos-blade")
+        ))]
+        self.blade_textures.sort_by_key(|texture| texture.order);
     }
 
     #[cfg_attr(
@@ -166,6 +189,21 @@ impl Scene {
             surfaces: &self.surfaces,
             surfaces_start: 0,
             surfaces_iter: self.surfaces.iter().peekable(),
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            blade_textures: &self.blade_textures,
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            blade_textures_start: 0,
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            blade_textures_iter: self.blade_textures.iter().peekable(),
         }
     }
 }
@@ -187,6 +225,11 @@ pub(crate) enum PrimitiveKind {
     MonochromeSprite,
     PolychromeSprite,
     Surface,
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    BladeTexture,
 }
 
 pub(crate) enum PaintOperation {
@@ -204,6 +247,11 @@ pub(crate) enum Primitive {
     MonochromeSprite(MonochromeSprite),
     PolychromeSprite(PolychromeSprite),
     Surface(PaintSurface),
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    BladeTexture(BladeTexture),
 }
 
 impl Primitive {
@@ -216,6 +264,11 @@ impl Primitive {
             Primitive::MonochromeSprite(sprite) => &sprite.bounds,
             Primitive::PolychromeSprite(sprite) => &sprite.bounds,
             Primitive::Surface(surface) => &surface.bounds,
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            Primitive::BladeTexture(texture) => &texture.bounds,
         }
     }
 
@@ -228,6 +281,11 @@ impl Primitive {
             Primitive::MonochromeSprite(sprite) => &sprite.content_mask,
             Primitive::PolychromeSprite(sprite) => &sprite.content_mask,
             Primitive::Surface(surface) => &surface.content_mask,
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            Primitive::BladeTexture(texture) => &texture.content_mask,
         }
     }
 }
@@ -261,6 +319,21 @@ struct BatchIterator<'a> {
     surfaces: &'a [PaintSurface],
     surfaces_start: usize,
     surfaces_iter: Peekable<slice::Iter<'a, PaintSurface>>,
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    blade_textures: &'a [BladeTexture],
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    blade_textures_start: usize,
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    blade_textures_iter: Peekable<slice::Iter<'a, BladeTexture>>,
 }
 
 impl<'a> Iterator for BatchIterator<'a> {
@@ -289,6 +362,14 @@ impl<'a> Iterator for BatchIterator<'a> {
             (
                 self.surfaces_iter.peek().map(|s| s.order),
                 PrimitiveKind::Surface,
+            ),
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            (
+                self.blade_textures_iter.peek().map(|t| t.order),
+                PrimitiveKind::BladeTexture,
             ),
         ];
         orders_and_kinds.sort_by_key(|(order, kind)| (order.unwrap_or(u32::MAX), *kind));
@@ -420,6 +501,26 @@ impl<'a> Iterator for BatchIterator<'a> {
                     &self.surfaces[surfaces_start..surfaces_end],
                 ))
             }
+            #[cfg(any(
+                all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+                all(target_os = "macos", feature = "macos-blade")
+            ))]
+            PrimitiveKind::BladeTexture => {
+                let textures_start = self.blade_textures_start;
+                let mut textures_end = textures_start + 1;
+                self.blade_textures_iter.next();
+                while self
+                    .blade_textures_iter
+                    .next_if(|texture| (texture.order, batch_kind) < max_order_and_kind)
+                    .is_some()
+                {
+                    textures_end += 1;
+                }
+                self.blade_textures_start = textures_end;
+                Some(PrimitiveBatch::BladeTextures(
+                    &self.blade_textures[textures_start..textures_end],
+                ))
+            }
         }
     }
 }
@@ -446,6 +547,11 @@ pub(crate) enum PrimitiveBatch<'a> {
         sprites: &'a [PolychromeSprite],
     },
     Surfaces(&'a [PaintSurface]),
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    BladeTextures(&'a [BladeTexture]),
 }
 
 #[derive(Default, Debug, Clone)]
@@ -665,6 +771,34 @@ pub(crate) struct PaintSurface {
 impl From<PaintSurface> for Primitive {
     fn from(surface: PaintSurface) -> Self {
         Primitive::Surface(surface)
+    }
+}
+
+/// A texture rendered by an external Blade renderer, displayed via zero-copy sharing.
+///
+/// This primitive allows external renderers (like isos-render) to create textures
+/// on a shared Blade GPU context and display them in GPUI-CE without CPU-side copies.
+#[derive(Clone, Debug)]
+#[cfg(any(
+    all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+    all(target_os = "macos", feature = "macos-blade")
+))]
+pub(crate) struct BladeTexture {
+    pub order: DrawOrder,
+    pub bounds: Bounds<ScaledPixels>,
+    pub content_mask: ContentMask<ScaledPixels>,
+    pub corner_radii: Corners<ScaledPixels>,
+    pub texture_view: blade_graphics::TextureView,
+    pub opacity: f32,
+}
+
+#[cfg(any(
+    all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+    all(target_os = "macos", feature = "macos-blade")
+))]
+impl From<BladeTexture> for Primitive {
+    fn from(texture: BladeTexture) -> Self {
+        Primitive::BladeTexture(texture)
     }
 }
 

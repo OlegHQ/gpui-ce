@@ -3,8 +3,8 @@
 
 use super::{BladeAtlas, BladeContext};
 use crate::{
-    Background, Bounds, DevicePixels, GpuSpecs, MonochromeSprite, Path, Point, PolychromeSprite,
-    PrimitiveBatch, Quad, ScaledPixels, Scene, Shadow, Size, Underline,
+    Background, Bounds, Corners, DevicePixels, GpuSpecs, MonochromeSprite, Path, Point,
+    PolychromeSprite, PrimitiveBatch, Quad, ScaledPixels, Scene, Shadow, Size, Underline,
     get_gamma_correction_ratios,
 };
 use blade_graphics as gpu;
@@ -108,6 +108,44 @@ struct ShaderSurfacesData {
     s_surface: gpu::Sampler,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct PodCorners {
+    top_left: f32,
+    top_right: f32,
+    bottom_right: f32,
+    bottom_left: f32,
+}
+
+impl From<Corners<ScaledPixels>> for PodCorners {
+    fn from(corners: Corners<ScaledPixels>) -> Self {
+        Self {
+            top_left: corners.top_left.0,
+            top_right: corners.top_right.0,
+            bottom_right: corners.bottom_right.0,
+            bottom_left: corners.bottom_left.0,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct BladeTextureParams {
+    bounds: PodBounds,
+    content_mask: PodBounds,
+    corner_radii: PodCorners,
+    opacity: f32,
+    _pad: [f32; 3],
+}
+
+#[derive(blade_macros::ShaderData)]
+struct ShaderBladeTexturesData {
+    globals: GlobalParams,
+    texture_locals: BladeTextureParams,
+    t_texture: gpu::TextureView,
+    s_texture: gpu::Sampler,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[repr(C)]
 struct PathSprite {
@@ -132,6 +170,7 @@ struct BladePipelines {
     mono_sprites: gpu::RenderPipeline,
     poly_sprites: gpu::RenderPipeline,
     surfaces: gpu::RenderPipeline,
+    blade_textures: gpu::RenderPipeline,
 }
 
 impl BladePipelines {
@@ -154,6 +193,7 @@ impl BladePipelines {
         shader.check_struct_size::<Underline>();
         shader.check_struct_size::<MonochromeSprite>();
         shader.check_struct_size::<PolychromeSprite>();
+        shader.check_struct_size::<BladeTextureParams>();
 
         // See https://apoorvaj.io/alpha-compositing-opengl-blending-and-premultiplied-alpha/
         let blend_mode = match surface_info.alpha {
@@ -301,6 +341,20 @@ impl BladePipelines {
                 color_targets,
                 multisample_state: gpu::MultisampleState::default(),
             }),
+            blade_textures: gpu.create_render_pipeline(gpu::RenderPipelineDesc {
+                name: "blade-textures",
+                data_layouts: &[&ShaderBladeTexturesData::layout()],
+                vertex: shader.at("vs_blade_texture"),
+                vertex_fetches: &[],
+                primitive: gpu::PrimitiveState {
+                    topology: gpu::PrimitiveTopology::TriangleStrip,
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                fragment: Some(shader.at("fs_blade_texture")),
+                color_targets,
+                multisample_state: gpu::MultisampleState::default(),
+            }),
         }
     }
 
@@ -313,6 +367,7 @@ impl BladePipelines {
         gpu.destroy_render_pipeline(&mut self.mono_sprites);
         gpu.destroy_render_pipeline(&mut self.poly_sprites);
         gpu.destroy_render_pipeline(&mut self.surfaces);
+        gpu.destroy_render_pipeline(&mut self.blade_textures);
     }
 }
 
@@ -901,6 +956,28 @@ impl BladeRenderer {
 
                             _encoder.draw(0, 4, 0, 1);
                         }
+                    }
+                }
+                // BladeTexture rendering - zero-copy GPU texture sharing with external renderers
+                PrimitiveBatch::BladeTextures(textures) => {
+                    for texture in textures {
+                        let mut encoder = pass.with(&self.pipelines.blade_textures);
+                        encoder.bind(
+                            0,
+                            &ShaderBladeTexturesData {
+                                globals,
+                                texture_locals: BladeTextureParams {
+                                    bounds: texture.bounds.into(),
+                                    content_mask: texture.content_mask.bounds.into(),
+                                    corner_radii: texture.corner_radii.into(),
+                                    opacity: texture.opacity,
+                                    _pad: [0.0; 3],
+                                },
+                                t_texture: texture.texture_view.clone(),
+                                s_texture: self.atlas_sampler,
+                            },
+                        );
+                        encoder.draw(0, 4, 0, 1);
                     }
                 }
             }

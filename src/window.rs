@@ -3288,6 +3288,49 @@ impl Window {
         });
     }
 
+    /// Paint an external Blade texture into the scene for the next frame.
+    ///
+    /// This method allows external renderers (like isos-render) to display GPU textures
+    /// created on a shared Blade context without CPU-side buffer copies (zero-copy rendering).
+    ///
+    /// # Arguments
+    /// * `bounds` - The bounds where the texture should be rendered
+    /// * `corner_radii` - Optional corner radii for rounded corners
+    /// * `texture_view` - The Blade texture view to display
+    /// * `opacity` - The opacity of the texture (0.0 to 1.0)
+    ///
+    /// This method should only be called as part of the paint phase of element drawing.
+    #[cfg(any(
+        all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+        all(target_os = "macos", feature = "macos-blade")
+    ))]
+    pub fn paint_blade_texture(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        corner_radii: Corners<Pixels>,
+        texture_view: blade_graphics::TextureView,
+        opacity: f32,
+    ) {
+        use crate::BladeTexture;
+
+        self.invalidator.debug_assert_paint();
+
+        let scale_factor = self.scale_factor();
+        let bounds = bounds.scale(scale_factor);
+        let content_mask = self.content_mask().scale(scale_factor);
+        let corner_radii = corner_radii.scale(scale_factor);
+        let opacity = opacity * self.element_opacity();
+
+        self.next_frame.scene.insert_primitive(BladeTexture {
+            order: 0,
+            bounds,
+            content_mask,
+            corner_radii,
+            texture_view,
+            opacity,
+        });
+    }
+
     /// Removes an image from the sprite atlas.
     pub fn drop_image(&mut self, data: Arc<RenderImage>) -> Result<()> {
         for frame_index in 0..data.frame_count() {

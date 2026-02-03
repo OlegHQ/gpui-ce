@@ -3,6 +3,11 @@ use blade_graphics as gpu;
 use std::sync::Arc;
 use util::ResultExt;
 
+/// A Blade GPU context for rendering operations.
+///
+/// This context wraps the underlying Blade GPU context and provides methods
+/// for creating and managing GPU resources. It can be shared between GPUI-CE
+/// and external renderers for zero-copy texture sharing.
 #[cfg_attr(target_os = "macos", derive(Clone))]
 pub struct BladeContext {
     /// The underlying Blade GPU context. Exposed for external renderers
@@ -11,6 +16,10 @@ pub struct BladeContext {
 }
 
 impl BladeContext {
+    /// Creates a new Blade GPU context with default settings.
+    ///
+    /// The device ID can be overridden using the `ZED_DEVICE_ID` environment
+    /// variable (e.g., `ZED_DEVICE_ID=0x1234`).
     pub fn new() -> anyhow::Result<Self> {
         let device_id_forced = match std::env::var("ZED_DEVICE_ID") {
             Ok(val) => parse_pci_id(&val)
