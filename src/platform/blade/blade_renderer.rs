@@ -135,7 +135,7 @@ struct BladeTextureParams {
     content_mask: PodBounds,
     corner_radii: PodCorners,
     opacity: f32,
-    _pad: [f32; 3],
+    _pad: f32, // Align to 8 bytes to match shader struct size (56 bytes)
 }
 
 #[derive(blade_macros::ShaderData)]
@@ -971,7 +971,7 @@ impl BladeRenderer {
                                     content_mask: texture.content_mask.bounds.into(),
                                     corner_radii: texture.corner_radii.into(),
                                     opacity: texture.opacity,
-                                    _pad: [0.0; 3],
+                                    _pad: 0.0,
                                 },
                                 t_texture: texture.texture_view.clone(),
                                 s_texture: self.atlas_sampler,
